@@ -14,7 +14,242 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      generated_images: {
+        Row: {
+          attributes_id: string | null
+          case_id: string
+          created_at: string
+          generation_metadata: Json | null
+          generation_status: string | null
+          id: string
+          image_url: string | null
+        }
+        Insert: {
+          attributes_id?: string | null
+          case_id: string
+          created_at?: string
+          generation_metadata?: Json | null
+          generation_status?: string | null
+          id?: string
+          image_url?: string | null
+        }
+        Update: {
+          attributes_id?: string | null
+          case_id?: string
+          created_at?: string
+          generation_metadata?: Json | null
+          generation_status?: string | null
+          id?: string
+          image_url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generated_images_attributes_id_fkey"
+            columns: ["attributes_id"]
+            isOneToOne: false
+            referencedRelation: "suspect_physical_attributes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "generated_images_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "suspect_case_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      suspect_case_records: {
+        Row: {
+          arms_involved: string | null
+          contact_number: string | null
+          created_at: string
+          crime_committed: string | null
+          custodies: string | null
+          id: string
+          incident_location_address: string | null
+          incident_location_lat: number | null
+          incident_location_lng: number | null
+          incident_timestamp: string | null
+          reported_by: string | null
+          surveillance_footage_ref: string | null
+          suspect_address: string | null
+          suspect_name: string | null
+          updated_at: string
+          user_id: string
+          vehicles_involved: string | null
+        }
+        Insert: {
+          arms_involved?: string | null
+          contact_number?: string | null
+          created_at?: string
+          crime_committed?: string | null
+          custodies?: string | null
+          id?: string
+          incident_location_address?: string | null
+          incident_location_lat?: number | null
+          incident_location_lng?: number | null
+          incident_timestamp?: string | null
+          reported_by?: string | null
+          surveillance_footage_ref?: string | null
+          suspect_address?: string | null
+          suspect_name?: string | null
+          updated_at?: string
+          user_id: string
+          vehicles_involved?: string | null
+        }
+        Update: {
+          arms_involved?: string | null
+          contact_number?: string | null
+          created_at?: string
+          crime_committed?: string | null
+          custodies?: string | null
+          id?: string
+          incident_location_address?: string | null
+          incident_location_lat?: number | null
+          incident_location_lng?: number | null
+          incident_timestamp?: string | null
+          reported_by?: string | null
+          surveillance_footage_ref?: string | null
+          suspect_address?: string | null
+          suspect_name?: string | null
+          updated_at?: string
+          user_id?: string
+          vehicles_involved?: string | null
+        }
+        Relationships: []
+      }
+      suspect_physical_attributes: {
+        Row: {
+          accessories: string | null
+          age: number | null
+          beard_color: string | null
+          body_type: string | null
+          bridge_height: string | null
+          case_id: string
+          chin_shape: string | null
+          created_at: string
+          ear_lobes: string | null
+          ear_shape: string | null
+          ear_size: string | null
+          ethnicity: string | null
+          eye_bags_wrinkles: string | null
+          eye_color: string | null
+          eye_shape: string | null
+          eye_size_spacing: string | null
+          eyebrow_type: string | null
+          eyelashes: string | null
+          eyelid_type: string | null
+          facial_hair_type: string | null
+          gender: string | null
+          hair_length: string | null
+          hair_style: string | null
+          hair_texture: string | null
+          hairline_shape: string | null
+          head_shape: string | null
+          height_feet: number | null
+          helix_antihelix: string | null
+          id: string
+          lip_shape: string | null
+          lip_thickness: string | null
+          mouth_width: string | null
+          nose_shape: string | null
+          nose_tip_shape: string | null
+          nostril_width: string | null
+          other_skin_features: string | null
+          skin_tone: string | null
+          smile_type: string | null
+        }
+        Insert: {
+          accessories?: string | null
+          age?: number | null
+          beard_color?: string | null
+          body_type?: string | null
+          bridge_height?: string | null
+          case_id: string
+          chin_shape?: string | null
+          created_at?: string
+          ear_lobes?: string | null
+          ear_shape?: string | null
+          ear_size?: string | null
+          ethnicity?: string | null
+          eye_bags_wrinkles?: string | null
+          eye_color?: string | null
+          eye_shape?: string | null
+          eye_size_spacing?: string | null
+          eyebrow_type?: string | null
+          eyelashes?: string | null
+          eyelid_type?: string | null
+          facial_hair_type?: string | null
+          gender?: string | null
+          hair_length?: string | null
+          hair_style?: string | null
+          hair_texture?: string | null
+          hairline_shape?: string | null
+          head_shape?: string | null
+          height_feet?: number | null
+          helix_antihelix?: string | null
+          id?: string
+          lip_shape?: string | null
+          lip_thickness?: string | null
+          mouth_width?: string | null
+          nose_shape?: string | null
+          nose_tip_shape?: string | null
+          nostril_width?: string | null
+          other_skin_features?: string | null
+          skin_tone?: string | null
+          smile_type?: string | null
+        }
+        Update: {
+          accessories?: string | null
+          age?: number | null
+          beard_color?: string | null
+          body_type?: string | null
+          bridge_height?: string | null
+          case_id?: string
+          chin_shape?: string | null
+          created_at?: string
+          ear_lobes?: string | null
+          ear_shape?: string | null
+          ear_size?: string | null
+          ethnicity?: string | null
+          eye_bags_wrinkles?: string | null
+          eye_color?: string | null
+          eye_shape?: string | null
+          eye_size_spacing?: string | null
+          eyebrow_type?: string | null
+          eyelashes?: string | null
+          eyelid_type?: string | null
+          facial_hair_type?: string | null
+          gender?: string | null
+          hair_length?: string | null
+          hair_style?: string | null
+          hair_texture?: string | null
+          hairline_shape?: string | null
+          head_shape?: string | null
+          height_feet?: number | null
+          helix_antihelix?: string | null
+          id?: string
+          lip_shape?: string | null
+          lip_thickness?: string | null
+          mouth_width?: string | null
+          nose_shape?: string | null
+          nose_tip_shape?: string | null
+          nostril_width?: string | null
+          other_skin_features?: string | null
+          skin_tone?: string | null
+          smile_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "suspect_physical_attributes_case_id_fkey"
+            columns: ["case_id"]
+            isOneToOne: false
+            referencedRelation: "suspect_case_records"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
