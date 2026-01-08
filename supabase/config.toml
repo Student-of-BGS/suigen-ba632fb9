@@ -1,1 +1,4 @@
 project_id = "lxdksoajuaiwihldinnb"
+
+[functions.generate-suspect-image]
+verify_jwt = false
