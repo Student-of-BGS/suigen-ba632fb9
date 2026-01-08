@@ -6,8 +6,21 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+interface FeatureMeta {
+  value: string;
+  locked: boolean;
+  confidence: number; // 0-100
+}
+
+type FeatureMetadata = Record<string, FeatureMeta>;
+
+const getConfidenceLabel = (value: number): string => {
+  if (value <= 33) return "low";
+  if (value <= 66) return "medium";
+  return "high";
+};
+
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -21,7 +34,6 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Get the authorization header from the request
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
       return new Response(JSON.stringify({ error: "No authorization header" }), {
@@ -30,10 +42,12 @@ serve(async (req) => {
       });
     }
 
-    // Create Supabase client with user's token for RLS
     const supabase = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!);
 
-    const { case_id } = await req.json();
+    const { case_id, featureMetadata } = await req.json() as { 
+      case_id: string; 
+      featureMetadata?: FeatureMetadata;
+    };
 
     if (!case_id) {
       return new Response(JSON.stringify({ error: "case_id is required" }), {
@@ -43,8 +57,8 @@ serve(async (req) => {
     }
 
     console.log(`Generating images for case: ${case_id}`);
+    console.log("Feature metadata:", JSON.stringify(featureMetadata || {}));
 
-    // Fetch the physical attributes for this case
     const { data: attributes, error: attrError } = await supabase
       .from("suspect_physical_attributes")
       .select("*")
@@ -61,91 +75,130 @@ serve(async (req) => {
       });
     }
 
-    // Build detailed prompt from physical attributes
-    const buildPrompt = (attr: any) => {
+    // Build prompt with lock and confidence awareness
+    const buildPrompt = (attr: any, meta?: FeatureMetadata) => {
       const parts: string[] = [];
+      const lockedParts: string[] = [];
+      const highConfidenceParts: string[] = [];
+      
+      // Helper to add feature with metadata awareness
+      const addFeature = (key: string, value: string | null, label: string) => {
+        if (!value) return;
+        
+        const featureMeta = meta?.[key];
+        const isLocked = featureMeta?.locked ?? false;
+        const confidence = featureMeta?.confidence ?? 50;
+        const confidenceLevel = getConfidenceLabel(confidence);
+        
+        if (isLocked) {
+          lockedParts.push(`${label}: exactly ${value} (LOCKED - must not change)`);
+        } else if (confidenceLevel === "high") {
+          highConfidenceParts.push(`${label}: strongly ${value}`);
+        } else if (confidenceLevel === "low") {
+          parts.push(`${label}: approximately ${value} (can vary)`);
+        } else {
+          parts.push(`${label}: ${value}`);
+        }
+      };
       
       // Core identity
-      if (attr.gender) parts.push(`${attr.gender}`);
-      if (attr.age) parts.push(`approximately ${attr.age} years old`);
-      if (attr.ethnicity) parts.push(`${attr.ethnicity} ethnicity`);
+      addFeature("gender", attr.gender, "Gender");
+      addFeature("age", attr.age?.toString(), "Age");
+      addFeature("ethnicity", attr.ethnicity, "Ethnicity");
       
       // Body and face structure
-      if (attr.body_type) parts.push(`${attr.body_type} body type`);
-      if (attr.head_shape) parts.push(`${attr.head_shape} face shape`);
-      if (attr.chin_shape) parts.push(`${attr.chin_shape}`);
+      addFeature("body_type", attr.body_type, "Body type");
+      addFeature("head_shape", attr.head_shape, "Face shape");
+      addFeature("chin_shape", attr.chin_shape, "Chin");
       
       // Hair
-      const hairParts: string[] = [];
-      if (attr.hair_length) hairParts.push(attr.hair_length);
-      if (attr.hair_texture) hairParts.push(attr.hair_texture);
-      if (attr.hair_style) hairParts.push(attr.hair_style);
-      if (attr.hairline_shape) hairParts.push(`${attr.hairline_shape} hairline`);
-      if (hairParts.length > 0) parts.push(`${hairParts.join(" ")} hair`);
+      addFeature("hair_length", attr.hair_length, "Hair length");
+      addFeature("hair_texture", attr.hair_texture, "Hair texture");
+      addFeature("hair_style", attr.hair_style, "Hair style");
+      addFeature("hairline_shape", attr.hairline_shape, "Hairline");
       
       // Facial hair
       if (attr.facial_hair_type && attr.facial_hair_type !== "None") {
-        const beardDesc = attr.beard_color ? `${attr.beard_color} ${attr.facial_hair_type}` : attr.facial_hair_type;
-        parts.push(beardDesc);
+        addFeature("facial_hair_type", attr.facial_hair_type, "Facial hair");
+        addFeature("beard_color", attr.beard_color, "Beard color");
       }
       
       // Eyes
-      const eyeParts: string[] = [];
-      if (attr.eye_shape) eyeParts.push(attr.eye_shape);
-      if (attr.eye_color) eyeParts.push(attr.eye_color);
-      if (attr.eye_size_spacing) eyeParts.push(attr.eye_size_spacing);
-      if (eyeParts.length > 0) parts.push(`${eyeParts.join(" ")} eyes`);
-      if (attr.eyebrow_type) parts.push(`${attr.eyebrow_type} eyebrows`);
-      if (attr.eyelid_type) parts.push(`${attr.eyelid_type}`);
-      if (attr.eye_bags_wrinkles && attr.eye_bags_wrinkles !== "None") parts.push(attr.eye_bags_wrinkles);
+      addFeature("eyebrow_type", attr.eyebrow_type, "Eyebrows");
+      addFeature("eye_shape", attr.eye_shape, "Eye shape");
+      addFeature("eye_color", attr.eye_color, "Eye color");
+      addFeature("eye_size_spacing", attr.eye_size_spacing, "Eye size");
+      addFeature("eyelid_type", attr.eyelid_type, "Eyelids");
+      addFeature("eyelashes", attr.eyelashes, "Eyelashes");
+      if (attr.eye_bags_wrinkles && attr.eye_bags_wrinkles !== "None") {
+        addFeature("eye_bags_wrinkles", attr.eye_bags_wrinkles, "Eye features");
+      }
       
       // Nose
-      const noseParts: string[] = [];
-      if (attr.nose_shape) noseParts.push(attr.nose_shape);
-      if (attr.bridge_height) noseParts.push(`${attr.bridge_height} bridge`);
-      if (attr.nostril_width) noseParts.push(`${attr.nostril_width} nostrils`);
-      if (attr.nose_tip_shape) noseParts.push(`${attr.nose_tip_shape} tip`);
-      if (noseParts.length > 0) parts.push(`${noseParts.join(", ")} nose`);
+      addFeature("nose_shape", attr.nose_shape, "Nose shape");
+      addFeature("bridge_height", attr.bridge_height, "Nose bridge");
+      addFeature("nostril_width", attr.nostril_width, "Nostrils");
+      addFeature("nose_tip_shape", attr.nose_tip_shape, "Nose tip");
       
       // Mouth and lips
-      const mouthParts: string[] = [];
-      if (attr.lip_thickness) mouthParts.push(attr.lip_thickness);
-      if (attr.lip_shape) mouthParts.push(attr.lip_shape);
-      if (attr.mouth_width) mouthParts.push(`${attr.mouth_width} width`);
-      if (mouthParts.length > 0) parts.push(`${mouthParts.join(" ")} lips`);
-      if (attr.smile_type) parts.push(`${attr.smile_type} expression`);
+      addFeature("lip_thickness", attr.lip_thickness, "Lip thickness");
+      addFeature("lip_shape", attr.lip_shape, "Lip shape");
+      addFeature("mouth_width", attr.mouth_width, "Mouth width");
+      addFeature("smile_type", attr.smile_type, "Expression");
       
       // Ears
-      const earParts: string[] = [];
-      if (attr.ear_size) earParts.push(attr.ear_size);
-      if (attr.ear_shape) earParts.push(attr.ear_shape);
-      if (attr.ear_lobes) earParts.push(`${attr.ear_lobes} lobes`);
-      if (earParts.length > 0) parts.push(`${earParts.join(" ")} ears`);
+      addFeature("ear_size", attr.ear_size, "Ear size");
+      addFeature("ear_shape", attr.ear_shape, "Ear shape");
+      addFeature("ear_lobes", attr.ear_lobes, "Ear lobes");
+      addFeature("helix_antihelix", attr.helix_antihelix, "Ear details");
       
       // Skin
-      if (attr.skin_tone) parts.push(`${attr.skin_tone} skin tone`);
-      if (attr.other_skin_features && attr.other_skin_features !== "None") parts.push(attr.other_skin_features);
+      addFeature("skin_tone", attr.skin_tone, "Skin tone");
+      if (attr.other_skin_features && attr.other_skin_features !== "None") {
+        addFeature("other_skin_features", attr.other_skin_features, "Skin features");
+      }
       
       // Accessories
-      if (attr.accessories) parts.push(`wearing ${attr.accessories}`);
+      addFeature("accessories", attr.accessories, "Accessories");
       
-      const description = parts.join(", ");
+      // Build the prompt with priority sections
+      let prompt = "Create a realistic police sketch portrait of a person.\n\n";
       
-      return `Create a realistic police sketch portrait of a person with these features: ${description}. 
-The image should be a front-facing portrait suitable for suspect identification, with neutral background, 
+      if (lockedParts.length > 0) {
+        prompt += "CRITICAL FIXED FEATURES (These must be rendered EXACTLY as specified, no variation allowed):\n";
+        prompt += lockedParts.join("\n") + "\n\n";
+      }
+      
+      if (highConfidenceParts.length > 0) {
+        prompt += "HIGH CONFIDENCE FEATURES (Render these closely as specified, minimal variation):\n";
+        prompt += highConfidenceParts.join("\n") + "\n\n";
+      }
+      
+      if (parts.length > 0) {
+        prompt += "OTHER FEATURES (Can have natural variation within reason):\n";
+        prompt += parts.join("\n") + "\n\n";
+      }
+      
+      prompt += `The image should be a front-facing portrait suitable for suspect identification, with neutral background, 
 professional police composite sketch style, detailed facial features, photorealistic rendering.
 High quality, detailed facial features, natural lighting, neutral expression.`;
+      
+      return prompt;
     };
 
-    const prompt = buildPrompt(attributes);
+    const prompt = buildPrompt(attributes, featureMetadata);
     console.log("Generated prompt:", prompt);
 
-    // Generate 4 images using Lovable AI Gateway with Gemini image model
     const images: string[] = [];
     const numImages = 4;
 
     for (let i = 0; i < numImages; i++) {
       console.log(`Generating image ${i + 1} of ${numImages}...`);
+      
+      // For locked features, we emphasize consistency across variations
+      const variationNote = featureMetadata && Object.values(featureMetadata).some(m => m.locked)
+        ? `Variation ${i + 1}: Keep ALL locked features identical. Only vary unlocked features slightly.`
+        : `Variation ${i + 1} of ${numImages} - slight variation in angle or expression.`;
       
       const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
@@ -158,7 +211,7 @@ High quality, detailed facial features, natural lighting, neutral expression.`;
           messages: [
             {
               role: "user",
-              content: `${prompt} Variation ${i + 1} of ${numImages} - slight variation in angle or expression.`
+              content: `${prompt}\n\n${variationNote}`
             }
           ],
           modalities: ["image", "text"]
@@ -188,7 +241,7 @@ High quality, detailed facial features, natural lighting, neutral expression.`;
           });
         }
         
-        continue; // Skip this image and try the next
+        continue;
       }
 
       const result = await response.json();
